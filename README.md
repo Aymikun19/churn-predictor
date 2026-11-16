@@ -55,7 +55,7 @@ tests/                  pytest unit tests for feature engineering
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 python -m src.churn.train      # downloads data, trains, writes models/ and reports/
 streamlit run app.py
 pytest
