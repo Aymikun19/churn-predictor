@@ -5,12 +5,15 @@ import joblib
 import pandas as pd
 import streamlit as st
 
+LOGO = Path(__file__).parent / "assets" / "logo.png"
+
 from src.churn.features import add_features
 
 MODEL = Path(__file__).parent / "models" / "churn_model.joblib"
 
-st.set_page_config(page_title="Churn Risk Scorer", page_icon="📉", layout="centered")
-st.title("📉 Customer Churn Risk")
+st.set_page_config(page_title="Churn Risk Scorer", page_icon=str(LOGO), layout="centered")
+st.logo(str(LOGO), size="large")
+st.title("Customer Churn Risk")
 st.caption("Logistic-regression pipeline trained on the IBM Telco dataset. See the README for metrics.")
 
 if not MODEL.exists():

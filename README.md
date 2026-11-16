@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" alt="" width="64" height="64">
+
 # Customer Churn Predictor
 
 An end-to-end machine-learning project that predicts which telecom customers are likely to leave, explains why, and serves predictions in a **Streamlit** app.
