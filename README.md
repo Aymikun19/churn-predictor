@@ -42,6 +42,13 @@ The simple, interpretable logistic regression matches the tree ensembles here, s
 - Customers paying by electronic check churn the most
 - Each extra add-on service (security, backup, tech support…) lowers churn
 
+## The app
+
+- **Score a customer**: churn probability, how it compares with the customer base, and an exact explanation of the score (each feature's contribution to the log-odds, which add up to the prediction for a linear model).
+- **What-if analysis**: how the score changes with tenure, contract type and payment method, plus the single biggest retention lever.
+- **Batch scoring**: upload a customer CSV, see the risk distribution and revenue at risk, and download every customer's score.
+- **Model performance**: cross-validation and test metrics with the ROC curve.
+
 ## Project structure
 
 ```
