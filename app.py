@@ -64,7 +64,7 @@ st.caption(
     f"Customers scoring above the tuned threshold of {B['threshold']:.0%} are flagged as high risk."
 )
 
-tab_score, tab_whatif, tab_batch, tab_model = st.tabs(["Score a customer", "What-if analysis", "Batch scoring", "Model performance"])
+tab_score, tab_whatif, tab_seg, tab_batch, tab_model = st.tabs(["Score a customer", "What-if analysis", "Segment explorer", "Batch scoring", "Model performance"])
 
 with st.sidebar:
     st.header("Customer profile")
@@ -153,6 +153,58 @@ with tab_whatif:
     p_best = float(score(customer(**{**profile, best[0]: best[1]})).iloc[0])
     if p_best < p:
         st.success(f"The single biggest lever: switching {best[0]} to **{best[1]}** lowers the probability from {p:.0%} to {p_best:.0%}.")
+
+@st.cache_data
+def scored_population() -> pd.DataFrame:
+    out = POP.copy()
+    out["risk"] = score(REF).values
+    ch = out["Churn"]
+    out["churned"] = ch.astype(int) if pd.api.types.is_numeric_dtype(ch) else (ch.astype(str) == "Yes").astype(int)
+    out["Tenure band"] = pd.cut(out["tenure"], [-1, 6, 12, 24, 48, 72], labels=["0-6 mo", "7-12 mo", "13-24 mo", "25-48 mo", "49-72 mo"])
+    out["Senior"] = out["SeniorCitizen"].astype(str).map({"0": "No", "1": "Yes", "No": "No", "Yes": "Yes"})
+    return out
+
+
+SEGMENT_COLS = {"Contract": "Contract", "Internet service": "InternetService", "Payment method": "PaymentMethod",
+                "Tenure band": "Tenure band", "Senior citizen": "Senior", "Paperless billing": "PaperlessBilling",
+                "Tech support": "TechSupport", "Partner": "Partner"}
+
+with tab_seg:
+    st.subheader("Which customer groups churn the most?")
+    st.caption("Slice the full customer base by any attribute and compare actual churn with the model's predicted risk.")
+    sp = scored_population()
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        by = st.selectbox("Group customers by", list(SEGMENT_COLS), index=0)
+        filt = st.multiselect("Only include contracts", sorted(sp["Contract"].unique()), default=sorted(sp["Contract"].unique()))
+        min_n = st.slider("Hide groups smaller than", 0, 500, 50, step=25)
+    view = sp[sp["Contract"].isin(filt)] if filt else sp
+    col = SEGMENT_COLS[by]
+    seg = (view.groupby(col, observed=True)
+               .agg(Customers=("risk", "size"), **{"Actual churn": ("churned", "mean"), "Predicted risk": ("risk", "mean"),
+                                                   "Monthly revenue": ("MonthlyCharges", "sum")})
+               .reset_index().rename(columns={col: by}))
+    seg = seg[seg["Customers"] >= min_n].sort_values("Actual churn", ascending=False)
+    with c2:
+        if seg.empty:
+            st.info("No group is large enough. Lower the minimum size.")
+        else:
+            worst = seg.iloc[0]
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Highest-churn group", str(worst[by]))
+            m2.metric("Its churn rate", f"{worst['Actual churn']:.0%}", f"{worst['Actual churn'] - view['churned'].mean():+.0%} vs average", delta_color="inverse")
+            m3.metric("Revenue in that group", f"${worst['Monthly revenue']:,.0f}/mo")
+            st.bar_chart(seg.set_index(by)[["Actual churn", "Predicted risk"]], height=260, stack=False)
+    if not seg.empty:
+        st.dataframe(seg, hide_index=True, width="stretch", column_config={
+            "Actual churn": st.column_config.ProgressColumn("Actual churn", min_value=0, max_value=1, format="percent"),
+            "Predicted risk": st.column_config.ProgressColumn("Predicted risk", min_value=0, max_value=1, format="percent"),
+            "Monthly revenue": st.column_config.NumberColumn("Monthly revenue", format="$%d"),
+        })
+        same = seg["Actual churn"].rank().corr(seg["Predicted risk"].rank()) if len(seg) > 2 else 1.0
+        st.caption("Predicted risk sits above actual churn because the model is trained with balanced class weights to catch more churners. "
+                   f"What matters is the ordering: the rank correlation between predicted and actual churn across these groups is {same:.2f}.")
+        st.download_button("Download segment table", seg.to_csv(index=False).encode(), f"churn_by_{col.lower()}.csv", "text/csv")
 
 with tab_batch:
     st.subheader("Score a whole customer list")
